@@ -1,0 +1,50 @@
+#!/usr/bin/perl
+use LWP::Simple;
+use List::MoreUtils qw(uniq);
+use Pod::Usage;
+use Getopt::Long;
+
+my $help = 0;
+my $verbose = 0;
+my $outfile = '';
+GetOptions ('out:s' => \$outfile, 'verbose' => \$verbose, 'help|?' => \$help) or pod2usage(2);
+pod2usage("Usage: $0 [file ...] [-out file]") if $help || ((@ARGV == 0) && (-t STDIN));
+
+for my $infile (@ARGV) {
+  open (FILE, $infile);
+  if ($verbose) { print "Parsing file: $infile\n"; }
+  while (<FILE>) {
+    while ($_ =~ /\\(no|full)?[Cc]ite\w*\{([^\}]+)\}/g) {
+      push(@citeKeys,split(/,/, $2));
+    }
+  }
+  close ($infile);
+}
+@citeKeys = uniq(@citeKeys);
+if ($verbose) { $keysize = @citeKeys; print "$keysize citation keys found\n"; }
+
+if ($verbose) { print "Resolving keys on DBLP ...\n"; }
+foreach $item (@citeKeys) {
+  $contents = get("http://dblp.uni-trier.de/rec/bibtex/$item");
+  if (defined $contents) {
+    while($contents =~ /<pre>(.*?)<\/pre>/sg) {
+      $source = $1;
+      $toremove = quotemeta('<a href="http://dblp.uni-trier.de/db/about/bibtex.html">DBLP</a>:');
+      $source =~ s/$toremove//g;
+      $toremove = quotemeta('DBLP:');
+      $source =~ s/$toremove//g;
+      push(@bibentries, $source);
+    }
+  }
+}
+@bibentries = uniq(@bibentries);
+if ($verbose) { $bibsize = @bibentries; print "$bibsize bib entries generated\n"; }
+
+if ($outfile eq '') {
+  print STDOUT @bibentries;
+} else {
+  open (OUTFILE, ">$outfile");
+  print OUTFILE @bibentries;
+  close (OUTFILE);
+}
+exit;
