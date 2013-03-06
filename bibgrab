@@ -10,15 +10,25 @@ my $outfile = '';
 GetOptions ('out:s' => \$outfile, 'verbose' => \$verbose, 'help|?' => \$help) or pod2usage(2);
 pod2usage("Usage: $0 [file ...] [-out file]") if $help || ((@ARGV == 0) && (-t STDIN));
 
-for my $infile (@ARGV) {
-  open (FILE, $infile);
-  if ($verbose) { print "Parsing file: $infile\n"; }
-  while (<FILE>) {
-    while ($_ =~ /\\(no|full)?[Cc]ite\w*\{([^\}]+)\}/g) {
-      push(@citeKeys,split(/,/, $2));
-    }
+sub parseline {
+  while ($_ =~ /\\(no|full)?[Cc]ite\w*\{([^\}]+)\}/g) {
+    push(@citeKeys,split(/,/, $2));
   }
-  close ($infile);
+}
+if (@ARGV == 0) {
+  if ($verbose) { print "Parsing STDIN\n"; }
+  while (<STDIN>) {
+    &parseline($_);
+  }
+} else {
+  for my $infile (@ARGV) {
+    open (FILE, $infile);
+    if ($verbose) { print "Parsing file: $infile\n"; }
+    while (<FILE>) {
+      &parseline($_);
+    }
+    close ($infile);
+  }
 }
 @citeKeys = uniq(@citeKeys);
 if ($verbose) { $keysize = @citeKeys; print "$keysize citation keys found\n"; }
